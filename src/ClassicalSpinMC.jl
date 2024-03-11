@@ -12,7 +12,7 @@ include("lattice.jl")
 export Lattice, set_spin!, random_spin_orientation
 
 include("observables.jl")
-export get_magnetization
+export get_magnetization, find_SSSF_peaks
 
 include("helper.jl")
 

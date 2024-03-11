@@ -2,7 +2,6 @@ function Triangular()::UnitCell
     # create unit cell
     a1 = [1.0, 0.0]
     a2 = cos(pi/3) * [1,0] + sin(pi/3) * [0, 1]
-
     UC = UnitCell(a1, a2)
     return UC
 end 
