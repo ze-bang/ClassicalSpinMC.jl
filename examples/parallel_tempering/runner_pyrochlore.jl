@@ -11,7 +11,11 @@ mu_B = 0.67*k_B # K/T to meV/T
 #------------------------------------------
 # local z axis for each basis site 
 #------------------------------------------
-z = [[1,1,1],[1,-1,-1],[-1,1,-1], [-1,-1,1]]/sqrt(3)
+z1 = [1, 1, 1]/sqrt(3)
+z2 = [1,-1,-1]/sqrt(3)
+z3 = [-1,1,-1]/sqrt(3)
+z4 = [-1,-1,1]/sqrt(3)
+
 
 
 #------------------------------------------
@@ -30,6 +34,7 @@ x = [[-2,1,1],[-2,-1,-1],[2,1,-1], [2,-1,1]]/sqrt(6)
 # set MC parameters
 #------------------------------------------
 t_thermalization= Int(1e6)
+t_deterministic = Int(1e6)
 t_measurement= Int(1e6)
 probe_rate=2000
 swap_rate=50
@@ -39,11 +44,10 @@ checkpoint_rate=1000
 
 function run_pyrochlore(Jxx, Jyy, Jzz, gxx, gyy, gzz, h, n, Target, L, S, outpath, outprefix)
     
-    h1 = dot(x[1], h*n) * [gxx,0,0] + dot(z[1], h*n) *[0,0,gzz] + dot(y[1], h*n) * h^3 * (n[2]^3-3*n[1]^2*n[2]) * [0,gyy,0]
-    h2 = dot(x[2], h*n) * [gxx,0,0] + dot(z[2], h*n) *[0,0,gzz] + dot(y[2], h*n) * h^3 * (n[2]^3-3*n[1]^2*n[2]) * [0,gyy,0]
-    h3 = dot(x[3], h*n) * [gxx,0,0] + dot(z[3], h*n) *[0,0,gzz] + dot(y[3], h*n) * h^3 * (n[2]^3-3*n[1]^2*n[2]) * [0,gyy,0]
-    h4 = dot(x[4], h*n) * [gxx,0,0] + dot(z[4], h*n) *[0,0,gzz] + dot(y[4], h*n) * h^3 * (n[2]^3-3*n[1]^2*n[2]) * [0,gyy,0]
-
+    h1 = h*(n'*z1) * [gxx, gyy, gzz]
+    h2 = h*(n'*z2) * [gxx, gyy, gzz]
+    h3 = h*(n'*z3) * [gxx, gyy, gzz]
+    h4 = h*(n'*z4) * [gxx, gyy, gzz]
     
     # create unit cell 
     P = Pyrochlore()
@@ -56,9 +60,9 @@ function run_pyrochlore(Jxx, Jyy, Jzz, gxx, gyy, gzz, h, n, Target, L, S, outpat
     addZeemanCoupling!(P, 3, h3)
     addZeemanCoupling!(P, 4, h4)
     # generate lattice
-    lat = Lattice( (L,L,L), P, S) 
+    lat = Lattice((L,L,L), P, S, bc="periodic") 
 
-    params = Dict("t_thermalization"=>t_thermalization, "t_measurement"=>t_measurement, 
+    params = Dict("t_thermalization"=>t_thermalization, "t_deterministic"=>t_deterministic, "t_measurement"=>t_measurement, 
                     "probe_rate"=>probe_rate, "swap_rate"=>swap_rate, "overrelaxation_rate"=>overrelaxation, 
                     "report_interval"=>report_interval, "checkpoint_rate"=>checkpoint_rate)
 
@@ -105,6 +109,20 @@ function scan_line(Jxx, Jyy, Jzz, gxx, gyy, gzz, hmin, hmax, nScan, n, Target, L
 
 end
 
-# scan_line(0.6, 1.0, 0.6, 0.01, 4e-4, 1, 0.0, 1.0, 40, [1, 1, 1]/sqrt(3), 1e-7, 2, 1/2)
+function convergence_field(n)
+    scan_line(-0.6, 1.0, -0.6, 0, 0, 1, 0.0, 2.0, 40, n, 1e-7, 4, 1/2)
+    scan_line(-0.2, 1.0, -0.2, 0, 0, 1, 0.0, 2.0, 40, n, 1e-7, 4, 1/2)
+    scan_line(0.2, 1.0, 0.2, 0, 0, 1, 0.0, 2.0, 40, n, 1e-7, 4, 1/2)
+    scan_line(0.6, 1.0, 0.6, 0, 0, 1, 0.0, 2.0, 40, n, 1e-7, 4, 1/2)
+end
 
-run_pyrochlore(-0.08, 1.0, -0.08, 0.01, 4e-4, 1, 0.0, [1, 1, 1]/sqrt(3), 1e-7, 1, 1/2, "test", "")
+# run_pyrochlore(-0.6, 1.0, -0.6, 0, 0, 1, 0.0, [1, 1, 1]/sqrt(3), 1e-7, 1, 1/2, "test", "")
+
+# scan_line(-0.6, 1.0, -0.6, 0, 0, 1, 0.0, 1.0, 40, [1, 1, 0]/sqrt(2), 1e-7, 4, 1/2)
+# scan_line(0.6, 1.0, 0.6, 0, 0, 1, 0.0, 1.0, 40, [1, 1, 0]/sqrt(2), 1e-7, 2, 1/2)
+# scan_line(-0.6, 1.0, -0.6, 0, 0, 1, 0.0, 1.0, 40, [0, 0, 1], 1e-7, 2, 1/2)
+# scan_line(0.6, 1.0, 0.6, 0, 0, 1, 0.0, 1.0, 40, [0, 0, 1], 1e-7, 2, 1/2)
+
+convergence_field([1,1,1]/sqrt(3))
+convergence_field([1,1,0]/sqrt(2))
+convergence_field([0,0,1])
