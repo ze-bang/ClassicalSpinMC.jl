@@ -8,6 +8,8 @@ include("pyrochlore.jl")
 k_B = 1/11.6 # meV/K
 mu_B = 0.67*k_B # K/T to meV/T
 
+
+
 #------------------------------------------
 # local z axis for each basis site 
 #------------------------------------------
@@ -42,12 +44,13 @@ overrelaxation=10
 report_interval = Int(1e4)
 checkpoint_rate=1000
 
-function run_pyrochlore(Jxx, Jyy, Jzz, gxx, gyy, gzz, h, n, Target, L, S, outpath, outprefix)
+function simulated_annealing_pyrochlore(Jxx, Jyy, Jzz, gxx, gyy, gzz, B, n, Target, L, S, outpath, outprefix)
     
-    h1 = h*(n'*z1) * [gxx, gyy, gzz]
-    h2 = h*(n'*z2) * [gxx, gyy, gzz]
-    h3 = h*(n'*z3) * [gxx, gyy, gzz]
-    h4 = h*(n'*z4) * [gxx, gyy, gzz]
+    #h in tesla
+    h1 = mu_B*B*(n'*z1) * [gxx, gyy, gzz]
+    h2 = mu_B*B*(n'*z2) * [gxx, gyy, gzz]
+    h3 = mu_B*B*(n'*z3) * [gxx, gyy, gzz]
+    h4 = mu_B*B*(n'*z4) * [gxx, gyy, gzz]
     
     # create unit cell 
     P = Pyrochlore()
@@ -76,6 +79,45 @@ function run_pyrochlore(Jxx, Jyy, Jzz, gxx, gyy, gzz, h, n, Target, L, S, outpat
     # write to file 
     write_MC_checkpoint(mc)
 
+end
+
+function parallel_tempering_pyrochlore(Jxx, Jyy, Jzz, gxx, gyy, gzz, B, n, Tmin, Tmax, L, S, outpath, outprefix)
+    MPI.Initialized() || MPI.Init()
+    commSize = MPI.Comm_size(MPI.COMM_WORLD)
+    rank = MPI.Comm_rank(MPI.COMM_WORLD)
+
+    # get temperature on rank 
+    # create equal logarithmically spaced temperatures and get temperature on current rank 
+    temp = exp10.(range(log10(Tmin), stop=log10(Tmax), length=commSize) ) 
+    T = temp[rank+1]
+    #h in tesla
+    h1 = mu_B*B*(n'*z1) * [gxx, gyy, gzz]
+    h2 = mu_B*B*(n'*z2) * [gxx, gyy, gzz]
+    h3 = mu_B*B*(n'*z3) * [gxx, gyy, gzz]
+    h4 = mu_B*B*(n'*z4) * [gxx, gyy, gzz]
+    
+    # create unit cell 
+    P = Pyrochlore()
+
+    # add Hamiltonian terms
+    interactions = Dict("Jxx"=>Jxx, "Jyy"=>Jyy, "Jzz"=>Jzz)
+    addInteractionsLocal!(P, interactions) # bilinear spin term 
+    addZeemanCoupling!(P, 1, h1) # add zeeman coupling to each basis site
+    addZeemanCoupling!(P, 2, h2)
+    addZeemanCoupling!(P, 3, h3)
+    addZeemanCoupling!(P, 4, h4)
+    # generate lattice
+    lat = Lattice((L,L,L), P, S, bc="periodic") 
+
+    params = Dict("t_thermalization"=>t_thermalization, "t_deterministic"=>t_deterministic, "t_measurement"=>t_measurement, 
+                    "probe_rate"=>probe_rate, "swap_rate"=>swap_rate, "overrelaxation_rate"=>overrelaxation, 
+                    "report_interval"=>report_interval, "checkpoint_rate"=>checkpoint_rate)
+
+    # create MC object 
+    mc = MonteCarlo(Target, lat, params, outpath=outpath, outprefix=outprefix)
+
+    # perform MC tasks 
+    parallel_tempering!(mc, [0]) # output measurements on rank 0
 end
 
 function scan_line(Jxx, Jyy, Jzz, gxx, gyy, gzz, hmin, hmax, nScan, n, Target, L, S)
@@ -123,6 +165,14 @@ end
 # scan_line(-0.6, 1.0, -0.6, 0, 0, 1, 0.0, 1.0, 40, [0, 0, 1], 1e-7, 2, 1/2)
 # scan_line(0.6, 1.0, 0.6, 0, 0, 1, 0.0, 1.0, 40, [0, 0, 1], 1e-7, 2, 1/2)
 
-convergence_field([1,1,1]/sqrt(3))
-convergence_field([1,1,0]/sqrt(2))
-convergence_field([0,0,1])
+# convergence_field([1,1,1]/sqrt(3))
+# convergence_field([1,1,0]/sqrt(2))
+# convergence_field([0,0,1]) 
+
+run_pyrochlore(0.062, 0.063, 0.011, 0, 0, 2.18, 1.5, [1, 1, 0]/sqrt(2), 1e-7, 8, 1/2, "simulated_annealing_low_T_B110=1.5T", "Ce2Zr2O7")
+
+# n = [0, 0, 1]
+# scan_line(0.6, 1.0, 0.6, 0, 0, 1, 0.0, 2.0, 40, n, 1e-7, 2, 1/2)
+# scan_line(0.2, 1.0, 0.2, 0, 0, 1, 0.0, 2.0, 40, n, 1e-7, 2, 1/2)
+# scan_line(-0.2, 1.0, -0.2, 0, 0, 1, 0.0, 2.0, 40, n, 1e-7, 2, 1/2)
+# scan_line(-0.6, 1.0, -0.6, 0, 0, 1, 0.0, 2.0, 40, n, 1e-7, 2, 1/2)
