@@ -1,6 +1,7 @@
 using LinearAlgebra
 using MPI
 using ClassicalSpinMC
+using molecular_dynamic
 include("pyrochlore.jl")
 #------------------------------------------
 # constants
@@ -169,7 +170,9 @@ end
 # convergence_field([1,1,0]/sqrt(2))
 # convergence_field([0,0,1]) 
 
-run_pyrochlore(0.062, 0.063, 0.011, 0, 0, 2.18, 1.5, [1, 1, 0]/sqrt(2), 1e-7, 8, 1/2, "simulated_annealing_low_T_B110=1.5T", "Ce2Zr2O7")
+# run_pyrochlore(0.062, 0.063, 0.011, 0, 0, 2.18, 1.5, [1, 1, 0]/sqrt(2), 1e-7, 8, 1/2, "simulated_annealing_low_T_B110=1.5T", "Ce2Zr2O7")
+
+parallel_tempering_pyrochlore(0.062, 0.063, 0.011, 0, 0, 2.18, 1.5, [1, 1, 0]/sqrt(2), 0.09*k_B, 14*k_B, 8, 1/2, "simulated_annealing_low_T_B110=1.5T", "Ce2Zr2O7")
 
 # n = [0, 0, 1]
 # scan_line(0.6, 1.0, 0.6, 0, 0, 1, 0.0, 2.0, 40, n, 1e-7, 2, 1/2)

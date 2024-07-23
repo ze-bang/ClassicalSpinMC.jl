@@ -179,6 +179,12 @@ function write_MC_checkpoint(mc)
     close(file)
 end
 
+function write_MC_checkpoint_t(mc, t)
+    file = h5open(string(mc.outpath, "time=", t), "w")
+    file["spins"][:,:] = mc.lattice.spins #overwrite current spins
+    close(file)
+end
+
 """
 Write spins of current spin configuration to .h5 file.
 """
