@@ -117,6 +117,11 @@ function overrelaxation!(lattice::Lattice)
     for site=1:lattice.size
         si = get_spin(lattice.spins, site)
         H = get_local_field(lattice, site)
+        # if no local field, keep spin as is
+        if H == (0.0, 0.0, 0.0)
+            println("no local field")
+            continue 
+        end
         proj = 2.0 * dot(si, H) / (H[1]^2 + H[2]^2 + H[3]^2)
         newspin = (-si[1] + proj*H[1], -si[2]+proj*H[2], -si[3]+proj*H[3] ) 
         set_spin!(lattice.spins, newspin, site)
@@ -145,15 +150,22 @@ function simulated_annealing!(mc::MonteCarlo, schedule::Function, T0::Float64=1.
     time = 1
     out = length(mc.outpath) > 0
 
-    accept_total = mc.parameters.t_thermalization*mc.lattice.size / mc.parameters.overrelaxation_rate
+    accept_total = mc.parameters.t_thermalization*mc.lattice.size 
+    if mc.parameters.overrelaxation_rate != 0
+        accept_total /= mc.parameters.overrelaxation_rate
+    end
 
     while T > mc.T
         t = 1
         R = 0.0
         mc.sigma = mc.sigma0
         while t < mc.parameters.t_thermalization 
-            overrelaxation!(mc.lattice)
-            if t % mc.parameters.overrelaxation_rate == 0
+            if mc.parameters.overrelaxation_rate != 0
+                overrelaxation!(mc.lattice)
+                if t % mc.parameters.overrelaxation_rate == 0
+                    R += alg(mc, T)
+                end
+            else 
                 R += alg(mc, T)
             end
             t += 1
@@ -181,6 +193,10 @@ function deterministic_updates!(mc::MonteCarlo)
     while sweeps < mc.parameters.t_deterministic
         point = rand(1:mc.lattice.size) # pick random index
         field = get_local_field(mc.lattice, point)
+        if field == (0.0, 0.0, 0.0)
+            sweeps +=1
+            continue 
+        end
         set_spin!(mc.lattice.spins, .-field ./ norm(field) .* mc.lattice.S, point)
         sweeps +=1 
     end
